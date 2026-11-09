@@ -12,5 +12,5 @@ export interface Config {
   restoreContext?: boolean
 }
 
-/** Requires the DSH session-projection and system-prompt services and the existing todo_write tool. */
+/** Requires the DSH session-projection, system-prompt and tools services and the existing todo_write tool. */
 export declare function apply(ctx: Context, config?: Config): Promise<void>

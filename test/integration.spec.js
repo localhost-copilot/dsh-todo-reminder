@@ -8,7 +8,6 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as TodoReminder from '../index.js'
 
@@ -40,7 +39,10 @@ async function setup(t, script, config = {}, beforeStart = () => {}) {
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt, { personaPrefix: '' })
   await ctx.plugin(ToolRuntime)
-  await ctx.plugin(NativeToolExecutor)
+  // 0.2.1 owns native execution in Tools; 0.2.2 extracts it to a separate plugin.
+  if (typeof ctx.tools.selectExecutor === 'function') {
+    await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
+  }
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(ToolTodo, { allowParallelInProgress: true })

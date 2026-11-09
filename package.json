@@ -28,7 +28,7 @@
   },
   "engines": {
     "node": ">=24.9.0",
-    "dsh": "^0.2.2-rc.1"
+    "dsh": "^0.2.1-rc.2 || ^0.2.2-rc.1"
   },
   "dsh": {
     "bundle": {
@@ -39,7 +39,7 @@
     "zod": "4.6.7"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.1.0"
+    "@deepseek-ai/cordis": "^4.0.5"
   },
   "license": "MIT"
 }
