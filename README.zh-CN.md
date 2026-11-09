@@ -7,28 +7,30 @@
 ## 前置条件
 
 - Node.js ≥24.9
+- `pnpm` 在 `PATH` 中——`dsh plugin` 通过它安装
 - profile 中已提供 `todo_write`、tools、session-projection、system-prompt 服务
 
 已验证 Desktop 随附的 DSH 0.2.1-rc.2、已安装 CLI 的 0.2.2-rc.1，以及相邻 `deepseek-harness` 源码。
 
 ## 安装
 
-1. 在 checkout 内安装依赖：
+直接从仓库安装，无需 clone 或本地路径：
 
-   ```sh
-   cd <path-to-dsh-todo>
-   npm ci
-   ```
+```sh
+dsh plugin --profile <profile> add github:localhost-copilot/dsh-todo-reminder
+```
 
-2. 以 link 方式注册到 profile：
+将 `<profile>` 替换为实际使用的 profile 名。该命令经 pnpm 解析，因此 `pnpm` 需在 `PATH` 中。安装会把包加入 profile 的 bundle 列表，插件随后通过其 `dsh.bundle.patch` 加载；只在 profile 目录里手动添加依赖不会启用 bundle。
 
-   ```sh
-   dsh plugin --profile <profile> add link:<path-to-dsh-todo>
-   ```
+git 安装跟随默认分支。需要固定版本时指定 tag 或 commit：
 
-将 `<profile>` 替换为实际使用的 profile 名。插件通过 `dsh.bundle.patch` 加载；仅在 profile 目录执行 `pnpm add` 不保证启用 bundle。如果已启用旧的 `@bewaremypower/dsh-todo-reminder`，先移除旧插件，避免重复提醒和相同 entry ID 冲突。
+```sh
+dsh plugin --profile <profile> add github:localhost-copilot/dsh-todo-reminder#<tag-or-commit>
+```
 
-`desktop` 是 Electron 专属管理的 profile，安装入口是 Desktop 的 Plugins → Add plugin，填写同一个 `link:<path-to-dsh-todo>` 地址。CLI 会拒绝 `dsh plugin --profile desktop`。
+如果已启用旧的 `@bewaremypower/dsh-todo-reminder`，先移除旧插件，避免重复提醒和相同 entry ID 冲突。
+
+`desktop` 是 Electron 专属管理的 profile，安装入口是 Desktop 的 Plugins → Add plugin，填写同一个 `github:localhost-copilot/dsh-todo-reminder` 地址。CLI 会拒绝 `dsh plugin --profile desktop`。
 
 在 `dsh-TUI` 中使用时，安装到其 DSH 后端实际选用的 profile。插件没有额外的 TUI 面板：清单沿用现有 todo 展示，提醒作为模型可见的 notice 注入。Claude/Codex 等其他后端不运行这些 DSH hooks。本项目尚未进行 TUI 界面实测。
 
@@ -71,6 +73,16 @@
 设计参考 CC 恢复源码中的双计数提醒，以及 Grok 的压缩后任务快照。结束时的 TodoGate、OpenCode Goal 等持续执行机制不在当前功能范围内。
 
 ## 开发与验证
+
+从 clone 开始：
+
+```sh
+git clone https://github.com/localhost-copilot/dsh-todo-reminder.git
+cd dsh-todo-reminder
+npm ci
+```
+
+然后：
 
 ```sh
 npm run check

@@ -7,28 +7,30 @@ Long-running DSH sessions drift: the model writes a todo list, works for fifty s
 ## Requirements
 
 - Node.js ≥24.9
+- `pnpm` on `PATH` — `dsh plugin` installs through it
 - A DSH profile that already provides `todo_write`, tools, session-projection and system-prompt services
 
 Verified against DSH 0.2.1-rc.2 (bundled with Desktop), 0.2.2-rc.1 (installed CLI), and the adjacent `deepseek-harness` source.
 
 ## Installation
 
-1. Install dependencies in the checkout:
+Install straight from the repository — no clone, no local path:
 
-   ```sh
-   cd <path-to-dsh-todo>
-   npm ci
-   ```
+```sh
+dsh plugin --profile <profile> add github:localhost-copilot/dsh-todo-reminder
+```
 
-2. Register the plugin as a link in your profile:
+Replace `<profile>` with the profile you actually use. This resolves through pnpm, so `pnpm` must be on `PATH`. The install appends the package to the profile's bundle list, and the plugin is then loaded through its `dsh.bundle.patch`; adding the dependency by hand inside the profile directory does not enable the bundle.
 
-   ```sh
-   dsh plugin --profile <profile> add link:<path-to-dsh-todo>
-   ```
+Git installs follow the default branch. Pin a tag or commit when you want a fixed revision:
 
-Replace `<profile>` with the profile you actually use. The plugin is loaded through `dsh.bundle.patch`; running `pnpm add` inside the profile directory alone does not enable the bundle. If the older `@bewaremypower/dsh-todo-reminder` is still enabled, remove it first — otherwise you get duplicate reminders and colliding entry IDs.
+```sh
+dsh plugin --profile <profile> add github:localhost-copilot/dsh-todo-reminder#<tag-or-commit>
+```
 
-`desktop` is managed exclusively by Electron. Install there through Desktop → Plugins → Add plugin, using the same `link:<path-to-dsh-todo>` address; the CLI rejects `dsh plugin --profile desktop`.
+If the older `@bewaremypower/dsh-todo-reminder` is still enabled, remove it first — otherwise you get duplicate reminders and colliding entry IDs.
+
+`desktop` is managed exclusively by Electron. Install there through Desktop → Plugins → Add plugin, entering the same `github:localhost-copilot/dsh-todo-reminder` address; the CLI rejects `dsh plugin --profile desktop`.
 
 Inside `dsh-TUI`, install into the profile its DSH backend actually selects. The plugin ships no TUI panel: the list renders wherever todos already render, and reminders arrive as model-visible notices. Other backends such as Claude/Codex never run these DSH hooks. The TUI has not been tested against this project.
 
@@ -71,6 +73,16 @@ On DSH 0.2.2, `index.js` checks availability against the tool set resolved for e
 The design follows the dual-counter reminder in CC's restore source and Grok's post-compaction task snapshot. Persistent-execution machinery — end-of-turn TodoGate, OpenCode Goal — is out of scope.
 
 ## Development and verification
+
+Work from a clone:
+
+```sh
+git clone https://github.com/localhost-copilot/dsh-todo-reminder.git
+cd dsh-todo-reminder
+npm ci
+```
+
+Then:
 
 ```sh
 npm run check
