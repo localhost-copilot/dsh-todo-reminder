@@ -1,36 +1,50 @@
 # dsh-todo
 
-DSH 的 todo 提醒插件。复用已有 `todo_write` 工具，在清单长时间未更新时给模型低频提醒，并通过 DSH runtime context 保留当前未完成清单。
+[English](README.md) | [简体中文](README.zh-CN.md)
 
-## 安装
+Long-running DSH sessions drift: the model writes a todo list, works for fifty steps, and stops checking it. This plugin keeps that list in view. It reuses the existing `todo_write` tool, nudges the model only when the list has gone stale for a while, and restores the current open list into DSH runtime context after compaction. It adds no new tool, no new turn, and no extra storage.
 
-需要 Node.js ≥24.9，以及 profile 中已有的 `todo_write`、tools、session-projection、system-prompt 服务。已验证 Desktop 随附的 DSH 0.2.1-rc.2、已安装 CLI 的 0.2.2-rc.1，以及相邻 `deepseek-harness` 源码。
+## Requirements
 
-```sh
-cd <path-to-dsh-todo>
-npm ci
-dsh plugin --profile <profile> add link:<path-to-dsh-todo>
-```
+- Node.js ≥24.9
+- A DSH profile that already provides `todo_write`, tools, session-projection and system-prompt services
 
-将 `<profile>` 替换为实际使用的 profile 名。插件通过 `dsh.bundle.patch` 加载；仅在 profile 目录执行 `pnpm add` 不保证启用 bundle。如果已启用旧的 `@bewaremypower/dsh-todo-reminder`，先移除旧插件，避免重复提醒和相同 entry ID 冲突。
+Verified against DSH 0.2.1-rc.2 (bundled with Desktop), 0.2.2-rc.1 (installed CLI), and the adjacent `deepseek-harness` source.
 
-`desktop` 是 Electron 专属管理的 profile，安装入口是 Desktop 的 Plugins → Add plugin，填写同一个 `link:<path-to-dsh-todo>` 地址。CLI 会拒绝 `dsh plugin --profile desktop`。
+## Installation
 
-在 `dsh-TUI` 中使用时，安装到其 DSH 后端实际选用的 profile。插件没有额外的 TUI 面板；清单沿用现有 todo 展示，提醒作为模型可见的 notice 注入。Claude/Codex 等其他后端不运行这些 DSH hooks。本项目尚未进行 TUI 界面实测。
+1. Install dependencies in the checkout:
 
-## 行为
+   ```sh
+   cd <path-to-dsh-todo>
+   npm ci
+   ```
 
-- 只根据成功提交的 `todo/write` 更新清单；失败或被拒绝的工具调用不重置计数。
-- 每条非空、非纯 reasoning 的已提交 assistant 响应计一步；一次响应中的并行或嵌套工具调用不额外计数。失败的模型尝试、工具结果、压缩替换副本不计数。
-- 默认距上次成功写入至少 10 步，且距上次提醒至少 10 步时提醒；后续每隔至少 10 步可再次提醒。
-- 从未创建、已清空或全部完成的清单不提醒。真实用户消息给予新的宽限期；`turn/start` 清空清单状态，与 DSH todo 工具一致。
-- 在下一次已获准的模型请求前添加提醒，由 agent loop 记录为 `user/message`。拒绝的步骤、已取消的请求、没有获准使用 `todo_write` 的步骤不添加提醒。
-- 当前清单通过 `systemPrompt.context()` 贡献给 DSH：清单变化或压缩移除快照后，由 DSH 重新记录；内容不变时由 DSH 去重。最多显示 20 个未完成项，每项描述最多 240 个 UTF-16 code units，额外项目显示数量。
-- 提醒允许模型保持准确清单不变。插件不发起新 turn，不阻止结束，也不自动完成、删除或取消任务。
+2. Register the plugin as a link in your profile:
 
-## 配置
+   ```sh
+   dsh plugin --profile <profile> add link:<path-to-dsh-todo>
+   ```
 
-可在 profile 的 Cordis patch 中覆盖 bundle entry：
+Replace `<profile>` with the profile you actually use. The plugin is loaded through `dsh.bundle.patch`; running `pnpm add` inside the profile directory alone does not enable the bundle. If the older `@bewaremypower/dsh-todo-reminder` is still enabled, remove it first — otherwise you get duplicate reminders and colliding entry IDs.
+
+`desktop` is managed exclusively by Electron. Install there through Desktop → Plugins → Add plugin, using the same `link:<path-to-dsh-todo>` address; the CLI rejects `dsh plugin --profile desktop`.
+
+Inside `dsh-TUI`, install into the profile its DSH backend actually selects. The plugin ships no TUI panel: the list renders wherever todos already render, and reminders arrive as model-visible notices. Other backends such as Claude/Codex never run these DSH hooks. The TUI has not been tested against this project.
+
+## Behavior
+
+- The list tracks only successfully committed `todo/write` calls. Failed or rejected tool calls do not reset the counters.
+- Each non-empty committed assistant response that isn't pure reasoning counts as one step. Parallel or nested tool calls inside a single response add no extra steps. Failed model attempts, tool results, and compaction replacement copies do not count.
+- A reminder fires after at least 10 steps since the last successful write **and** at least 10 since the last reminder; later reminders repeat at intervals of at least 10 steps. Both thresholds are configurable.
+- Lists that were never created, were cleared, or are fully completed get no reminders. A real user message grants a fresh grace period. `turn/start` clears list state, matching the DSH todo tool.
+- The reminder is queued before the next permitted model request and recorded by the agent loop as a `user/message`. Rejected steps, cancelled requests, and steps without permitted `todo_write` use get nothing.
+- The open list is contributed to DSH through `systemPrompt.context()`. DSH re-records it when the list changes or when compaction drops the snapshot, and deduplicates unchanged content. At most 20 open items are shown, each description capped at 240 UTF-16 code units, and any remainder is summarized as a count.
+- The reminder leaves an accurate list untouched. The plugin never starts a turn, never blocks completion, and never completes, deletes or cancels tasks on its own.
+
+## Configuration
+
+Override the bundle entry in the profile's Cordis patch:
 
 ```yaml
 - id: todo-reminder
@@ -40,17 +54,23 @@ dsh plugin --profile <profile> add link:<path-to-dsh-todo>
     restoreContext: true
 ```
 
-两个间隔都必须是正安全整数。首次提醒也要求满足两个间隔；例如 `staleAfterSteps: 5`、`repeatEverySteps: 10`，首次至少等待 10 步。`restoreContext: false` 关闭清单快照，保留周期提醒。
+| Key | Default | Effect |
+| --- | --- | --- |
+| `staleAfterSteps` | `10` | Steps since the last successful write before the list counts as stale. |
+| `repeatEverySteps` | `10` | Steps between reminders once the list is stale. |
+| `restoreContext` | `true` | Contribute the open list via `systemPrompt.context()`. Set `false` to keep reminders but drop the snapshot. |
 
-## 状态与扩展范围
+Both intervals must be positive safe integers, and the first reminder must satisfy both. With `staleAfterSteps: 5` and `repeatEverySteps: 10`, for example, the first reminder still waits at least 10 steps.
 
-`src/projection.js` 注册一个 host-only projection，纯函数重放已提交事件，得到清单及两个计数。DSH 负责 checkpoint、恢复和事件驱动更新。projection 是派生缓存，`todo/write` 仍是唯一清单来源；没有额外文件存储，也不调用已弃用的同步历史扫描 API。
+## State and scope
 
-`index.js` 在 DSH 0.2.2 中使用每次组装时已解析的 tool set 检查可用性；0.2.1 尚无 step-time admission，使用该版本 tools registry 的可见性。projection 同样兼容 0.2.1 的注册 disposer 与按 key 读取接口、0.2.2 的异步 reader handle。pre-step waterfall 保留下游的拒绝、消息及 request-series 标记。普通 reminder 和“直到目标完成才停止”的执行控制各自独立；本项目实现前者。
+`src/projection.js` registers a host-only projection. Its pure functions replay committed events into the list plus the two counters; DSH owns checkpoints, restore and event-driven updates. The projection is a derived cache — `todo/write` stays the single source of the list. No extra files, no calls to the deprecated synchronous history-scanning API.
 
-设计参考 CC 恢复源码中的双计数提醒，以及 Grok 的压缩后任务快照。结束时的 TodoGate、OpenCode Goal 等持续执行机制不在当前功能范围内。
+On DSH 0.2.2, `index.js` checks availability against the tool set resolved for each assembly. 0.2.1 has no step-time admission, so it falls back to the visibility of that version's tools registry. The projection likewise supports 0.2.1's registration disposer and key-based reads alongside 0.2.2's async reader handle. The pre-step waterfall preserves downstream rejections, messages and request-series marks. Ordinary reminders and "keep going until the goal is done" execution control are separate concerns; this plugin implements only the former.
 
-## 开发与验证
+The design follows the dual-counter reminder in CC's restore source and Grok's post-compaction task snapshot. Persistent-execution machinery — end-of-turn TodoGate, OpenCode Goal — is out of scope.
+
+## Development and verification
 
 ```sh
 npm run check
@@ -59,8 +79,8 @@ DSH_RUNTIME='/Applications/DeepSeek Harness.app/Contents/Resources/app/dsh' npm 
 npm pack --dry-run
 ```
 
-`check` 执行语法检查和独立行为测试。集成测试需要已安装依赖（含 tsx）的 DSH 源码，默认查找相邻 `../deepseek-harness`。测试启动器仅在子进程中将 workspace 包解析到源码；checkout 缺失的 zod 链接回退到本项目已安装的依赖，不修改 harness 文件或 node_modules。
+`check` runs syntax checks plus the standalone behavior tests. Integration tests need a DSH source checkout with dependencies installed (tsx included) and look for an adjacent `../deepseek-harness` by default. The launcher resolves workspace packages to the source only inside the child process; a missing zod link in the checkout falls back to this project's installed dependency, without touching harness files or `node_modules`.
 
-`DSH_RUNTIME` 模式直接使用安装目录中的运行库，无需 tsx 或源码。源码模式与两个安装版本运行同一组集成测试。
+`DSH_RUNTIME` mode runs directly against the runtime libraries in the install directory — no tsx, no source. Source mode and both installed versions run the same suite.
 
-集成测试使用真实 agent loop、session、projection registry、todo 工具及工具执行器，只模拟模型和读取工具。验证并行调用计数、提醒实际进入请求和日志、失败写入、中途卸载重载，以及快照替换后恢复。通过的源码版本为 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`，安装版本为 Desktop 0.2.1-rc.2 和 CLI 0.2.2-rc.1；这些测试无需 API key，不代表真实模型一定遵循提醒。
+The suite drives a real agent loop, session, projection registry, todo tool and tool executor, mocking only the model and the read tool. It covers parallel-call counting, reminders actually reaching requests and logs, failed writes, unload/reload mid-run, and recovery after snapshot replacement. Passing source revision: `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`. Passing installs: Desktop 0.2.1-rc.2, CLI 0.2.2-rc.1. No API key required — these tests prove the plumbing, not that a real model will obey the reminder.
